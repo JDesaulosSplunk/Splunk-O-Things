@@ -1,4 +1,4 @@
-  /*
+/* https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiClientBasic/WiFiClientBasic.ino
  *  This sketch sends a message to a TCP server
  *
  */
@@ -7,7 +7,7 @@
 #include <ESP8266WiFiMulti.h>
 
 ESP8266WiFiMulti WiFiMulti;
-String temp;
+
 void setup() {
     Serial.begin(9600);
     delay(10);
@@ -36,7 +36,8 @@ void setup() {
 void loop() {
     const uint16_t port = 2319;
     const char * host = "192.168.10.82"; // ip or dns
-
+    // char tf = Serial.read();
+    String tf = Serial.readString();
     
     
     Serial.print("connecting to ");
@@ -51,14 +52,11 @@ void loop() {
         delay(5000);
         return;
     }
-    delay(10000);
-    temp = Serial.read();
-    delay(1000);
+
     // This will send the request to the server
-    client.print(temp);
-    Serial.println("3");
-    Serial.println(temp);
-    delay(2000);
+    client.print("Send this data to server");
+    client.print(tf);
+    Serial.print("1: %s", tf);
 
     //read back one line from server
     String line = client.readStringUntil('\r');
