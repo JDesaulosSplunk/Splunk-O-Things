@@ -13,7 +13,7 @@ void setup() {
     delay(10);
 
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("Splunk-Guest-PL", "legacyplace");
+    WiFiMulti.addAP("SSID", "PASS");
 
     Serial.println();
     Serial.println();
