@@ -2,6 +2,14 @@
  *  This sketch sends a message to a TCP server
  *
  */
+// Date and time functions using a DS1307 RTC connected via I2C and Wire lib
+#include <Wire.h>
+#include "RTClib.h"
+
+#if defined(ARDUINO_ARCH_SAMD)
+// for Zero, output on USB Serial console, remove line below if using programming port to program the Zero!
+   #define Serial SerialUSB
+#endif
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
@@ -12,11 +20,33 @@ DHT dht(DHTPIN, DHTTYPE);
 float f;
 char buffer[6];
 
+RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
 
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
 void setup() {
+    
+    #ifndef ESP8266
+      while (!Serial); // for Leonardo/Micro/Zero
+    #endif
+    
     Serial.begin(9600);
     delay(10);
+      
+    if (! rtc.begin()) {
+      Serial.println("Couldn't find RTC");  
+    while (1);
+    }
+
+    if (! rtc.initialized()) {
+      Serial.println("RTC is NOT running!");
+      // following line sets the RTC to the date & time this sketch was compiled
+      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+      // This line sets the RTC with an explicit date & time, for example to set
+      // January 21, 2014 at 3am you would call:
+      // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    }
 
     // We start by connecting to a WiFi network
     WiFiMulti.addAP("SSID", "PASS");
@@ -41,12 +71,17 @@ void setup() {
 
 
 void loop() {
+    DateTime now = rtc.now();
+    
     const uint16_t port = 2319;
     const char * host = "192.168.10.82"; // ip or dns
 
     f = dht.readTemperature(true);
     String tf = dtostrf(f, 4, 1, buffer);
-    Serial.println(tf);
+
+    Serial.print(now.unixtime());
+    Serial.println(" " + tf);
+    
     Serial.print("connecting to ");
     Serial.println(host);
 
@@ -59,13 +94,13 @@ void loop() {
         delay(5000);
         return;
     }
-
+    
     // This will send the request to the server
     //Serial.print("1: " + tf);
     delay(5000);
-    client.print("Send this data to server");
-    client.print(tf);
-
+    String time  = String(now.unixtime(),DEC); 
+    
+    client.print("Temperature: " + tf);
 
     //read back one line from server
     //String line = client.readStringUntil('\r');
