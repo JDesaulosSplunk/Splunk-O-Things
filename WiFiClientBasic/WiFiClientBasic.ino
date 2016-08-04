@@ -26,8 +26,6 @@ ESP8266WiFiMulti WiFiMulti;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 
-int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
-int photocellReading;     // the analog reading from the sensor divider
 
 void setup() {
 
@@ -36,7 +34,7 @@ void setup() {
       while (!Serial); // for Leonardo/Micro/Zero
     #endif
     
-    Serial.begin(115200);
+    Serial.begin(9600);
     delay(10);
       
     if (! rtc.begin()) {
@@ -79,8 +77,6 @@ void setup() {
 void loop() {
     DateTime now = rtc.now();
 
-    photocellReading = analogRead(photocellPin);
-
     f = dht.readTemperature(true);
     String tf = dtostrf(f, 4, 1, buffer);
 
@@ -104,14 +100,11 @@ void loop() {
     // This will send the request to the server
     //Serial.print("1: " + tf);
     delay(1000);
-    long time2 = 147032524;
-    String time3  = (String)now.unixtime(); 
-    //String temporary = " " + tf;
-    client.println(tf + " " + photocellReading + " " + time3.substring(0,4) + time3.substring(5));
-
-    delay(3000);
     
-    Serial.println(tf + " " + photocellReading + " " + time3);
+    String time  = (String)now.unixtime(); 
+    //String temporary = " " + tf;
+    client.println("Temperature: " + tf);
+    Serial.println(tf);
     //client.print("time " + time);
     Serial.println(sizeof(tf));
     //read back one line from server
