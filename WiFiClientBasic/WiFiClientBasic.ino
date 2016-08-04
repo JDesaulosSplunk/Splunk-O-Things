@@ -18,7 +18,10 @@
 #define DHTTYPE DHT11   // DHT 11
 DHT dht(DHTPIN, DHTTYPE); 
 float f;
+float h;
 char buffer[6];
+// Use WiFiClient class to create TCP connections
+WiFiClient client;
 
 RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
@@ -34,7 +37,7 @@ void setup() {
       while (!Serial); // for Leonardo/Micro/Zero
     #endif
     
-    Serial.begin(9600);
+    Serial.begin(115200);
     delay(10);
       
     if (! rtc.begin()) {
@@ -52,7 +55,7 @@ void setup() {
     }
 
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("SSID", "PASS");
+    WiFiMulti.addAP("Splunk-Guest-PL", "legacyplace");
 
     Serial.println();
     Serial.println();
@@ -69,6 +72,21 @@ void setup() {
     Serial.println(WiFi.localIP());
 
     delay(500);
+
+    const uint16_t port = 2319;
+    const char * host = "192.168.10.82"; // ip or dns
+
+    Serial.print("connecting to ");
+    Serial.println(host);
+
+    
+
+    if (!client.connect(host, port)) {
+        Serial.println("connection failed");
+        Serial.println("wait 5 sec...");
+        delay(5000);
+        return;
+    }
     
 }
 
@@ -78,43 +96,33 @@ void loop() {
     DateTime now = rtc.now();
 
     f = dht.readTemperature(true);
-    String tf = dtostrf(f, 4, 1, buffer);
-
-    const uint16_t port = 2319;
-    const char * host = "192.168.10.82"; // ip or dns
-
-    Serial.print("connecting to ");
-    Serial.println(host);
-
-    // Use WiFiClient class to create TCP connections
-    WiFiClient client;
-
-    if (!client.connect(host, port)) {
-        Serial.println("connection failed");
-        Serial.println("wait 5 sec...");
-        delay(5000);
-        return;
-    }
+    h = dht.readHumidity();
     
-
+    String tf = dtostrf(f, 4, 1, buffer);
+    float hif = dht.computeHeatIndex(f, h);
     // This will send the request to the server
-    //Serial.print("1: " + tf);
     delay(1000);
     
-    String time  = (String)now.unixtime(); 
-    //String temporary = " " + tf;
-    client.println("Temperature: " + tf);
-    Serial.println(tf);
-    //client.print("time " + time);
-    Serial.println(sizeof(tf));
-    //read back one line from server
-    //String line = client.readStringUntil('\r');
-    //client.println("temp : " + tf);
+    String timeYear  = (String)(now.year()); 
+    String timeMonth  = (String)(now.month());
+    String timeDay  = (String)(now.day());  
+    String timeHour  = (String)(now.hour()); 
+    String timeMinute  = (String)(now.minute()); 
+    String timeSecond  = (String)(now.second()); 
 
-    Serial.println("closing connection");
-    client.stop();
+    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
+    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
+
+    client.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Heat Index\":\"" + hif + "\"}");
+    Serial.println("{\"Time\":\"" + timeOut + " " + timeOut2 + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Heat Index\":\"" + hif + "\"}");
+    Serial.println(timeOut);
+    Serial.println(timeOut2);
+    Serial.println(sizeof(tf));
+
+//    Serial.println("closing connection");
+//    client.stop();
     
-    Serial.println("wait 5 sec...");
+    Serial.println("wait 1 sec...");
     delay(1000);
 }
 
