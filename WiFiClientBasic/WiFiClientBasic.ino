@@ -25,8 +25,11 @@ ESP8266WiFiMulti WiFiMulti;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
+
+
 void setup() {
-    
+
+
     #ifndef ESP8266
       while (!Serial); // for Leonardo/Micro/Zero
     #endif
@@ -66,22 +69,20 @@ void setup() {
     Serial.println(WiFi.localIP());
 
     delay(500);
+    
 }
 
 
 
 void loop() {
     DateTime now = rtc.now();
-    
-    const uint16_t port = 2319;
-    const char * host = "192.168.10.82"; // ip or dns
 
     f = dht.readTemperature(true);
     String tf = dtostrf(f, 4, 1, buffer);
 
-    Serial.print(now.unixtime());
-    Serial.println(" " + tf);
-    
+    const uint16_t port = 2319;
+    const char * host = "192.168.10.82"; // ip or dns
+
     Serial.print("connecting to ");
     Serial.println(host);
 
@@ -95,21 +96,25 @@ void loop() {
         return;
     }
     
+
     // This will send the request to the server
     //Serial.print("1: " + tf);
-    delay(5000);
-    String time  = String(now.unixtime(),DEC); 
+    delay(1000);
     
-    client.print("Temperature: " + tf);
-
+    String time  = (String)now.unixtime(); 
+    String temporary = " " + tf;
+    client.println(temporary);
+    Serial.println(temporary);
+    //client.print("time " + time);
+    Serial.println(sizeof(temporary));
     //read back one line from server
     //String line = client.readStringUntil('\r');
-    //client.println(line);
+    //client.println("temp : " + tf);
 
     Serial.println("closing connection");
     client.stop();
     
     Serial.println("wait 5 sec...");
-    delay(5000);
+    delay(1000);
 }
 
