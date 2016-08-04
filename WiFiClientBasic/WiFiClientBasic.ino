@@ -102,11 +102,11 @@ void loop() {
     delay(1000);
     
     String time  = (String)now.unixtime(); 
-    String temporary = " " + tf;
-    client.println(temporary);
-    Serial.println(temporary);
+    //String temporary = " " + tf;
+    client.println("Temperature: " + tf);
+    Serial.println(tf);
     //client.print("time " + time);
-    Serial.println(sizeof(temporary));
+    Serial.println(sizeof(tf));
     //read back one line from server
     //String line = client.readStringUntil('\r');
     //client.println("temp : " + tf);
