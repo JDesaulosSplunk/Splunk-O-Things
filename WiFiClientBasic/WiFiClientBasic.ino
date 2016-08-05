@@ -14,6 +14,10 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include "DHT.h"
+
+#include <SPI.h>
+#include <SD.h>
+
 #define DHTPIN 2 
 #define DHTTYPE DHT11   // DHT 11
 DHT dht(DHTPIN, DHTTYPE); 
@@ -28,10 +32,11 @@ RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-
+TimeSpan offset = 18467;
 
 int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
 int photocellReading;     // the analog reading from the sensor divider
+const int chipSelect = 15;
 
 void setup() {
 
@@ -42,6 +47,17 @@ void setup() {
     
     Serial.begin(115200);
     delay(10);
+
+    
+    Serial.print("Initializing SD card...");
+  
+    // see if the card is present and can be initialized:
+    if (!SD.begin(chipSelect)) {
+      Serial.println("Card failed, or not present");
+      // don't do anything more:
+      return;
+    }
+    Serial.println("card initialized.");
       
     if (! rtc.begin()) {
       Serial.println("Couldn't find RTC");  
@@ -58,7 +74,7 @@ void setup() {
     }
 
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("WIFI979F44", "7135049040");
+    WiFiMulti.addAP("Splunk-Guest-PL","legacyplace");
 
     Serial.println();
     Serial.println();
@@ -77,7 +93,7 @@ void setup() {
     delay(500);
 
     const uint16_t port = 2319;
-    const char * host = "192.168.0.5"; // ip or dns
+    const char * host = "192.168.10.82"; // ip or dns
 
     Serial.print("connecting to ");
     Serial.println(host);
@@ -96,8 +112,8 @@ void setup() {
 
 
 void loop() {
-   
 
+    
     f = dht.readTemperature(true);
     h = dht.readHumidity();
     
@@ -106,7 +122,7 @@ void loop() {
     pR = analogRead(photocellPin);
 
 //    delay(10000);
-    DateTime now = rtc.now();
+    DateTime now = rtc.now() + offset;
 //  
 //    String timeYear  = (String)(now.year()); 
 //    String timeMonth  = (String)(now.month());
@@ -118,8 +134,25 @@ void loop() {
 //    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
 //    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
 
-    client.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}");
-    Serial.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}");
+
+    String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}";
+    
+    client.println(dataString);
+    Serial.println(dataString);
+  
+    File dataFile = SD.open("datalog.txt", FILE_WRITE);
+    
+    // if the file is available, write to it:
+    if (dataFile) {
+      dataFile.println(dataString);
+      dataFile.close();
+      // print to the serial port too:
+      Serial.println(dataString);
+    }
+    // if the file isn't open, pop up an error:
+    else {
+      Serial.println("error opening datalog.txt");
+    }
 //    Serial.println(timeOut);
 //    Serial.println(timeOut2);
 //    Serial.println(sizeof(tf));
@@ -128,6 +161,6 @@ void loop() {
 //    client.stop();
     
     Serial.println("wait 1 sec...");
-    delay(10000);
+    delay(3000);
 }
 
