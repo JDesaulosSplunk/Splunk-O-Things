@@ -19,6 +19,7 @@
 DHT dht(DHTPIN, DHTTYPE); 
 float f;
 float h;
+int pR;
 char buffer[6];
 // Use WiFiClient class to create TCP connections
 WiFiClient client;
@@ -29,6 +30,8 @@ ESP8266WiFiMulti WiFiMulti;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 
+int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
+int photocellReading;     // the analog reading from the sensor divider
 
 void setup() {
 
@@ -55,7 +58,7 @@ void setup() {
     }
 
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("Splunk-Guest-PL", "legacyplace");
+    WiFiMulti.addAP("WIFI979F44", "7135049040");
 
     Serial.println();
     Serial.println();
@@ -74,7 +77,7 @@ void setup() {
     delay(500);
 
     const uint16_t port = 2319;
-    const char * host = "192.168.10.82"; // ip or dns
+    const char * host = "192.168.0.5"; // ip or dns
 
     Serial.print("connecting to ");
     Serial.println(host);
@@ -93,36 +96,38 @@ void setup() {
 
 
 void loop() {
-    DateTime now = rtc.now();
+   
 
     f = dht.readTemperature(true);
     h = dht.readHumidity();
     
     String tf = dtostrf(f, 4, 1, buffer);
     float hif = dht.computeHeatIndex(f, h);
-    // This will send the request to the server
-    delay(1000);
-    
-    String timeYear  = (String)(now.year()); 
-    String timeMonth  = (String)(now.month());
-    String timeDay  = (String)(now.day());  
-    String timeHour  = (String)(now.hour()); 
-    String timeMinute  = (String)(now.minute()); 
-    String timeSecond  = (String)(now.second()); 
+    pR = analogRead(photocellPin);
 
-    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
-    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
+//    delay(10000);
+    DateTime now = rtc.now();
+//  
+//    String timeYear  = (String)(now.year()); 
+//    String timeMonth  = (String)(now.month());
+//    String timeDay  = (String)(now.day());  
+//    String timeHour  = (String)(now.hour()); 
+//    String timeMinute  = (String)(now.minute()); 
+//    String timeSecond  = (String)(now.second()); 
+//
+//    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
+//    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
 
-    client.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Heat Index\":\"" + hif + "\"}");
-    Serial.println("{\"Time\":\"" + timeOut + " " + timeOut2 + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Heat Index\":\"" + hif + "\"}");
-    Serial.println(timeOut);
-    Serial.println(timeOut2);
-    Serial.println(sizeof(tf));
+    client.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}");
+    Serial.println("{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}");
+//    Serial.println(timeOut);
+//    Serial.println(timeOut2);
+//    Serial.println(sizeof(tf));
 
 //    Serial.println("closing connection");
 //    client.stop();
     
     Serial.println("wait 1 sec...");
-    delay(1000);
+    delay(10000);
 }
 
