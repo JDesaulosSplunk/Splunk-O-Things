@@ -32,11 +32,14 @@ RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-TimeSpan offset = 18467;
+TimeSpan offset = 19200;
 
 int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
 int photocellReading;     // the analog reading from the sensor divider
 const int chipSelect = 15;
+
+const uint16_t port = 2319;
+const char * host = "192.168.10.82"; // ip or dns
 
 void setup() {
 
@@ -92,8 +95,8 @@ void setup() {
 
     delay(500);
 
-    const uint16_t port = 2319;
-    const char * host = "192.168.10.82"; // ip or dns
+//    const uint16_t port = 2319;
+//    const char * host = "192.168.10.82"; // ip or dns
 
     Serial.print("connecting to ");
     Serial.println(host);
@@ -136,9 +139,31 @@ void loop() {
 
 
     String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}";
+
+//    client.stop(); // remove this line in production!!!!!!!!
     
-    client.println(dataString);
-    Serial.println(dataString);
+    if (client.connected()){
+      client.println(dataString);
+      Serial.print("Data sent over TCP: ");
+      Serial.println(dataString);
+    }
+    else{
+      Serial.println("Data NOT SENT OVER TCP! \n\t... but it is written to file. hopefully.");
+      Serial.println("Reconnecting to tcp port 2319");
+      
+      if (!client.connect(host, port)) {
+        Serial.println("connection failed");
+        Serial.println("wait 5 sec...");
+        delay(5000);
+        return;
+      }
+      else{
+        Serial.println("REconnected!! WHoop!");
+      }
+      client.println(dataString);
+      Serial.print("Data sent over TCP: ");
+      Serial.println(dataString);
+    }
   
     File dataFile = SD.open("datalog.txt", FILE_WRITE);
     
@@ -147,7 +172,7 @@ void loop() {
       dataFile.println(dataString);
       dataFile.close();
       // print to the serial port too:
-      Serial.println(dataString);
+//      Serial.println(dataString);
     }
     // if the file isn't open, pop up an error:
     else {
