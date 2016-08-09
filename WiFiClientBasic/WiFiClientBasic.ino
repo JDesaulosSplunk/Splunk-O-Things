@@ -138,7 +138,7 @@ void loop() {
 //    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
 
 
-    String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat Index\":\"" + hif + "\"}";
+    String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat_Index\":\"" + hif + "\"}";
 
 //    client.stop(); // remove this line in production!!!!!!!!
     
