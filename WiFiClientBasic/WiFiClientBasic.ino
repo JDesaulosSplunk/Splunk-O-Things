@@ -18,6 +18,7 @@
 #include <SPI.h>
 #include <SD.h>
 
+#include <WiFiUdp.h>
 #define DHTPIN 2 
 #define DHTTYPE DHT11   // DHT 11
 DHT dht(DHTPIN, DHTTYPE); 
@@ -32,14 +33,92 @@ RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-TimeSpan offset = 19200;
+TimeSpan offset = 18020;
 
 int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
 int photocellReading;     // the analog reading from the sensor divider
 const int chipSelect = 15;
 
+unsigned int localPort = 2390;      // local port to listen for UDP packets
+IPAddress timeServerIP; // time.nist.gov NTP server address
+const char* ntpServerName = "time.nist.gov";
+
+const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
+
+byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+
+// A UDP instance to let us send and receive packets over UDP
+WiFiUDP udp;
 const uint16_t port = 2319;
-const char * host = "192.168.10.82"; // ip or dns
+const char * host = "192.168.10.227"; // ip or dns
+
+unsigned long epoch;
+
+unsigned long sendNTPpacket(IPAddress& address) {
+  Serial.println("sending NTP packet...");
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  udp.beginPacket(address, 123); //NTP requests are to port 123
+  udp.write(packetBuffer, NTP_PACKET_SIZE);
+  udp.endPacket();
+}
+
+void doUDP(){
+  Serial.println("Starting UDP");
+    udp.begin(localPort);
+    Serial.print("Local port: ");
+    Serial.println(udp.localPort());
+
+    WiFi.hostByName(ntpServerName, timeServerIP);
+    sendNTPpacket(timeServerIP); // send an NTP packet to a time server
+    // wait to see if a reply is available
+    delay(1000);
+    
+    int cb = udp.parsePacket();
+    if (!cb) {
+      Serial.println("no packet yet");
+    }
+    else {
+      Serial.print("packet received, length=");
+      Serial.println(cb);
+      // We've received a packet, read the data from it
+      udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
+  
+      //the timestamp starts at byte 40 of the received packet and is four bytes,
+      // or two words, long. First, esxtract the two words:
+  
+      unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
+      unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
+      // combine the four bytes (two words) into a long integer
+      // this is NTP time (seconds since Jan 1 1900):
+      unsigned long secsSince1900 = highWord << 16 | lowWord;
+      Serial.print("Seconds since Jan 1 1900 = " );
+      Serial.println(secsSince1900);
+  
+      // now convert NTP time into everyday time:
+      Serial.print("Unix time = ");
+      // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
+      const unsigned long seventyYears = 2208988800UL;
+      // subtract seventy years:
+      epoch = secsSince1900 - seventyYears;
+      // print Unix time:
+      Serial.println(epoch);
+    }
+}
 
 void setup() {
 
@@ -61,20 +140,6 @@ void setup() {
       return;
     }
     Serial.println("card initialized.");
-      
-    if (! rtc.begin()) {
-      Serial.println("Couldn't find RTC");  
-    while (1);
-    }
-
-    if (! rtc.initialized()) {
-      Serial.println("RTC is NOT running!");
-      // following line sets the RTC to the date & time this sketch was compiled
-      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-      // This line sets the RTC with an explicit date & time, for example to set
-      // January 21, 2014 at 3am you would call:
-      // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-    }
 
     // We start by connecting to a WiFi network
     WiFiMulti.addAP("Splunk-Guest-PL","legacyplace");
@@ -109,7 +174,23 @@ void setup() {
         delay(5000);
         return;
     }
-    
+
+    doUDP();
+          
+    if (! rtc.begin()) {
+      Serial.println("Couldn't find RTC");  
+    while (1);
+    }
+
+    if (! rtc.initialized()) {
+      Serial.println("RTC is NOT running!");
+      // following line sets the RTC to the date & time this sketch was compiled
+      rtc.adjust(DateTime(epoch));
+      // This line sets the RTC with an explicit date & time, for example to set
+      // January 21, 2014 at 3am you would call:
+      // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    }
+
 }
 
 
@@ -123,24 +204,10 @@ void loop() {
     String tf = dtostrf(f, 4, 1, buffer);
     float hif = dht.computeHeatIndex(f, h);
     pR = analogRead(photocellPin);
-
-//    delay(10000);
-    DateTime now = rtc.now() + offset;
-//  
-//    String timeYear  = (String)(now.year()); 
-//    String timeMonth  = (String)(now.month());
-//    String timeDay  = (String)(now.day());  
-//    String timeHour  = (String)(now.hour()); 
-//    String timeMinute  = (String)(now.minute()); 
-//    String timeSecond  = (String)(now.second()); 
-//
-//    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
-//    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
-
+    
+    DateTime now = rtc.now();
 
     String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat_Index\":\"" + hif + "\"}";
-
-//    client.stop(); // remove this line in production!!!!!!!!
     
     if (client.connected()){
       client.println(dataString);
@@ -171,21 +238,15 @@ void loop() {
     if (dataFile) {
       dataFile.println(dataString);
       dataFile.close();
-      // print to the serial port too:
-//      Serial.println(dataString);
+
     }
     // if the file isn't open, pop up an error:
     else {
       Serial.println("error opening datalog.txt");
     }
-//    Serial.println(timeOut);
-//    Serial.println(timeOut2);
-//    Serial.println(sizeof(tf));
 
-//    Serial.println("closing connection");
-//    client.stop();
-    
     Serial.println("wait 1 sec...");
     delay(3000);
 }
+
 
