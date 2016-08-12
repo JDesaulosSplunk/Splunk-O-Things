@@ -53,6 +53,8 @@ const uint16_t port = 2319;
 const char * host = "192.168.10.227"; // ip or dns
 
 unsigned long epoch;
+unsigned long epochInit;
+String fName;
 
 unsigned long sendNTPpacket(IPAddress& address) {
   Serial.println("sending NTP packet...");
@@ -115,10 +117,85 @@ void doUDP(){
       const unsigned long seventyYears = 2208988800UL;
       // subtract seventy years:
       epoch = secsSince1900 - seventyYears;
+      epochInit = epoch;
       // print Unix time:
       Serial.println(epoch);
     }
 }
+void printDirectory(File dir, int numTabs) {
+  while (true) {
+
+    File entry =  dir.openNextFile();
+    if (! entry) {
+      // no more files
+      break;
+    }
+    for (uint8_t i = 0; i < numTabs; i++) {
+      Serial.print('\t');
+    }
+    Serial.print(entry.name());
+    if (entry.isDirectory()) {
+      Serial.println("/");
+      printDirectory(entry, numTabs + 1);
+    } else {
+      // files have sizes, directories do not
+      Serial.print("\t\t");
+      Serial.println(entry.size(), DEC);
+    }
+    entry.close();
+  }
+}
+
+void doLogging(DateTime timeNow, String datas) {
+
+    Serial.println("We're in!!!");
+    DateTime current = timeNow;
+
+    String timeYear  = (String)(current.year()); 
+    Serial.println(timeYear);
+    String timeMonth  = (String)(current.month());
+    Serial.println(timeMonth);
+    String timeDay  = (String)(current.day());
+    Serial.println(timeDay);
+    fName = timeYear.substring(2) + timeMonth + timeDay + ".log";
+    Serial.println(fName);
+    //Serial.println(SD.exists(fName));
+
+
+//    if (!fName) {
+//      Serial.println(fName + " doesn't exist.");
+//    } else {
+//      Serial.println(fName + " exists.");
+//    }
+
+    
+    
+//    File dataFile = SD.open("testing.txt", FILE_WRITE);
+    File dataFile = SD.open(fName.c_str(), FILE_WRITE);
+    Serial.println("this works too");
+    dataFile.close();
+    File root = SD.open("/");
+  
+    printDirectory(root, 0);
+  
+    Serial.println("done!");
+//    dataFile = SD.open("testing.txt", FILE_WRITE);
+    SD.open(fName.c_str(), FILE_WRITE);
+    // if the file is available, write to it:
+    if (dataFile) {
+      dataFile.println(datas);
+      dataFile.close();
+  
+    }
+    // if the file isn't open, pop up an error:
+    else {
+      
+      Serial.println("error opening datalog.txt");
+    }
+
+    dataFile.close();
+}
+
 
 void setup() {
 
@@ -231,19 +308,20 @@ void loop() {
       Serial.print("Data sent over TCP: ");
       Serial.println(dataString);
     }
-  
-    File dataFile = SD.open("datalog.txt", FILE_WRITE);
-    
-    // if the file is available, write to it:
-    if (dataFile) {
-      dataFile.println(dataString);
-      dataFile.close();
 
-    }
-    // if the file isn't open, pop up an error:
-    else {
-      Serial.println("error opening datalog.txt");
-    }
+    doLogging(now, dataString);
+//    File dataFile = SD.open("datalog.txt", FILE_WRITE);
+//    
+//    // if the file is available, write to it:
+//    if (dataFile) {
+//      dataFile.println(dataString);
+//      dataFile.close();
+//
+//    }
+//    // if the file isn't open, pop up an error:
+//    else {
+//      Serial.println("error opening datalog.txt");
+//    }
 
     Serial.println("wait 1 sec...");
     delay(3000);
