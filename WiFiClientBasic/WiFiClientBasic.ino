@@ -40,6 +40,7 @@ const int chipSelect = 15;
 
 const uint16_t port = 2319;
 <<<<<<< HEAD
+<<<<<<< HEAD
 const char * host = "192.168.10.227"; // ip or dns
 
 unsigned long epoch;
@@ -186,6 +187,9 @@ void doLogging(DateTime timeNow, String datas) {
     dataFile.close();
 }
 
+=======
+const char * host = "192.168.10.82"; // ip or dns
+>>>>>>> parent of 6824fa8... Internet of Time
 =======
 const char * host = "192.168.10.82"; // ip or dns
 >>>>>>> parent of 6824fa8... Internet of Time
@@ -346,6 +350,9 @@ void loop() {
 //    Serial.println(timeOut);
 //    Serial.println(timeOut2);
 //    Serial.println(sizeof(tf));
+<<<<<<< HEAD
+>>>>>>> parent of 6824fa8... Internet of Time
+=======
 >>>>>>> parent of 6824fa8... Internet of Time
 
 //    Serial.println("closing connection");
