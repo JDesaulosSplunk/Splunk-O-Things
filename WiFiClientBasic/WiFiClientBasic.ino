@@ -47,6 +47,8 @@ unsigned long epoch;
 unsigned long epochInit;
 String fName;
 
+String settings[4];
+
 unsigned long sendNTPpacket(IPAddress& address) {
   Serial.println("sending NTP packet...");
   // set all bytes in the buffer to 0
@@ -194,6 +196,39 @@ const char * host = "192.168.10.82"; // ip or dns
 const char * host = "192.168.10.82"; // ip or dns
 >>>>>>> parent of 6824fa8... Internet of Time
 
+void getSettings(char* fileName, String *settings)
+{  
+  byte b = 0;
+  if (SD.exists(fileName) == false)
+  {
+    Serial.println("File not found");
+    return;
+  }
+  File myFile = SD.open(fileName, FILE_READ);
+  if (!myFile)
+  {
+    Serial.println("Cannot open file");
+    return;
+  }
+  myFile.seek(0);
+  while (myFile.available())
+  {
+    settings[b] = myFile.readStringUntil('\n');
+    b++;
+  }  
+  myFile.close();
+  Serial.print("Host: ");
+  Serial.println(settings[0]);
+  Serial.print("Port: ");
+  Serial.println(settings[1]);
+  Serial.print("SSID: ");
+  Serial.println(settings[2]);
+  Serial.print("PASS: ");
+  Serial.println(settings[3]);
+//  Serial.print("my DNS: ");
+//  Serial.println(settings[4]);
+}
+
 void setup() {
 
 
@@ -229,8 +264,24 @@ void setup() {
       // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
     }
 
+    //******************************************************************
+    getSettings("config.txt", settings);
+
+    const uint16_t port2 = atoi(settings[1].c_str());
+    const char * host2 = settings[0].c_str(); // ip or dns
+
+    const char * mySSID2 = settings[2].c_str(); 
+    const char * PASS2 = settings[3].c_str(); 
+    Serial.println(port2);
+    Serial.println(host2);
+    Serial.println(mySSID2);
+    Serial.println(PASS2);
+
+
+    
+ //******************************************************************
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("Splunk-Guest-PL","legacyplace");
+    WiFiMulti.addAP(mySSID2,PASS2);
 
     Serial.println();
     Serial.println();
@@ -256,7 +307,7 @@ void setup() {
 
     
 
-    if (!client.connect(host, port)) {
+    if (!client.connect(host2, port2)) {
         Serial.println("connection failed");
         Serial.println("wait 5 sec...");
         delay(5000);
@@ -264,8 +315,6 @@ void setup() {
     }
     
 }
-
-
 
 void loop() {
 
