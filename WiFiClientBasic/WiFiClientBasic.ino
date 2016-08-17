@@ -18,6 +18,7 @@
 #include <SPI.h>
 #include <SD.h>
 
+#include <WiFiUdp.h>
 #define DHTPIN 2 
 #define DHTTYPE DHT11   // DHT 11
 DHT dht(DHTPIN, DHTTYPE); 
@@ -32,20 +33,26 @@ RTC_PCF8523 rtc;
 ESP8266WiFiMulti WiFiMulti;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-TimeSpan offset = 19200;
+TimeSpan offset = 18020;
 
 int photocellPin = 0;     // the cell and 10K pulldown are connected to a0
 int photocellReading;     // the analog reading from the sensor divider
 const int chipSelect = 15;
 
+unsigned int localPort = 2390;      // local port to listen for UDP packets
+IPAddress timeServerIP; // time.nist.gov NTP server address
+const char* ntpServerName = "time.nist.gov";
+
+const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
+
+byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+
+// A UDP instance to let us send and receive packets over UDP
+WiFiUDP udp;
 const uint16_t port = 2319;
-<<<<<<< HEAD
-<<<<<<< HEAD
 const char * host = "192.168.10.227"; // ip or dns
 
 unsigned long epoch;
-unsigned long epochInit;
-String fName;
 
 String settings[4];
 
@@ -110,91 +117,10 @@ void doUDP(){
       const unsigned long seventyYears = 2208988800UL;
       // subtract seventy years:
       epoch = secsSince1900 - seventyYears;
-      epochInit = epoch;
       // print Unix time:
       Serial.println(epoch);
     }
 }
-void printDirectory(File dir, int numTabs) {
-  while (true) {
-
-    File entry =  dir.openNextFile();
-    if (! entry) {
-      // no more files
-      break;
-    }
-    for (uint8_t i = 0; i < numTabs; i++) {
-      Serial.print('\t');
-    }
-    Serial.print(entry.name());
-    if (entry.isDirectory()) {
-      Serial.println("/");
-      printDirectory(entry, numTabs + 1);
-    } else {
-      // files have sizes, directories do not
-      Serial.print("\t\t");
-      Serial.println(entry.size(), DEC);
-    }
-    entry.close();
-  }
-}
-
-void doLogging(DateTime timeNow, String datas) {
-
-    Serial.println("We're in!!!");
-    DateTime current = timeNow;
-
-    String timeYear  = (String)(current.year()); 
-    Serial.println(timeYear);
-    String timeMonth  = (String)(current.month());
-    Serial.println(timeMonth);
-    String timeDay  = (String)(current.day());
-    Serial.println(timeDay);
-    fName = timeYear.substring(2) + timeMonth + timeDay + ".log";
-    Serial.println(fName);
-    //Serial.println(SD.exists(fName));
-
-
-//    if (!fName) {
-//      Serial.println(fName + " doesn't exist.");
-//    } else {
-//      Serial.println(fName + " exists.");
-//    }
-
-    
-    
-//    File dataFile = SD.open("testing.txt", FILE_WRITE);
-    File dataFile = SD.open(fName.c_str(), FILE_WRITE);
-    Serial.println("this works too");
-    dataFile.close();
-    File root = SD.open("/");
-  
-    printDirectory(root, 0);
-  
-    Serial.println("done!");
-//    dataFile = SD.open("testing.txt", FILE_WRITE);
-    SD.open(fName.c_str(), FILE_WRITE);
-    // if the file is available, write to it:
-    if (dataFile) {
-      dataFile.println(datas);
-      dataFile.close();
-  
-    }
-    // if the file isn't open, pop up an error:
-    else {
-      
-      Serial.println("error opening datalog.txt");
-    }
-
-    dataFile.close();
-}
-
-=======
-const char * host = "192.168.10.82"; // ip or dns
->>>>>>> parent of 6824fa8... Internet of Time
-=======
-const char * host = "192.168.10.82"; // ip or dns
->>>>>>> parent of 6824fa8... Internet of Time
 
 void getSettings(char* fileName, String *settings)
 {  
@@ -249,20 +175,6 @@ void setup() {
       return;
     }
     Serial.println("card initialized.");
-      
-    if (! rtc.begin()) {
-      Serial.println("Couldn't find RTC");  
-    while (1);
-    }
-
-    if (! rtc.initialized()) {
-      Serial.println("RTC is NOT running!");
-      // following line sets the RTC to the date & time this sketch was compiled
-      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-      // This line sets the RTC with an explicit date & time, for example to set
-      // January 21, 2014 at 3am you would call:
-      // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-    }
 
     //******************************************************************
     getSettings("config.txt", settings);
@@ -303,7 +215,7 @@ void setup() {
 //    const char * host = "192.168.10.82"; // ip or dns
 
     Serial.print("connecting to ");
-    Serial.println(host);
+    Serial.println(host2);
 
     
 
@@ -313,11 +225,28 @@ void setup() {
         delay(5000);
         return;
     }
-    
+
+    doUDP();
+          
+    if (! rtc.begin()) {
+      Serial.println("Couldn't find RTC");  
+    while (1);
+    }
+
+    if (! rtc.initialized()) {
+      Serial.println("RTC is NOT running!");
+      // following line sets the RTC to the date & time this sketch was compiled
+      rtc.adjust(DateTime(epoch));
+      // This line sets the RTC with an explicit date & time, for example to set
+      // January 21, 2014 at 3am you would call:
+      // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    }
+
 }
 
 void loop() {
-
+    const uint16_t port2 = atoi(settings[1].c_str());
+    const char * host2 = settings[0].c_str(); // ip or dns
     
     f = dht.readTemperature(true);
     h = dht.readHumidity();
@@ -325,24 +254,10 @@ void loop() {
     String tf = dtostrf(f, 4, 1, buffer);
     float hif = dht.computeHeatIndex(f, h);
     pR = analogRead(photocellPin);
-
-//    delay(10000);
-    DateTime now = rtc.now() + offset;
-//  
-//    String timeYear  = (String)(now.year()); 
-//    String timeMonth  = (String)(now.month());
-//    String timeDay  = (String)(now.day());  
-//    String timeHour  = (String)(now.hour()); 
-//    String timeMinute  = (String)(now.minute()); 
-//    String timeSecond  = (String)(now.second()); 
-//
-//    String timeOut/*put*/ = timeYear + " " + timeMonth + " " + timeDay;
-//    String timeOut2 = timeHour + ":" + timeMinute + ":" + timeSecond;
-
+    
+    DateTime now = rtc.now();
 
     String dataString = "{\"Time\":\"" + (String)now.unixtime() + "\",\"Temperature\":\"" + tf + "\",\"Humidity\":\"" + h + "\",\"Light\":\"" + pR + "\",\"Heat_Index\":\"" + hif + "\"}";
-
-//    client.stop(); // remove this line in production!!!!!!!!
     
     if (client.connected()){
       client.println(dataString);
@@ -353,7 +268,7 @@ void loop() {
       Serial.println("Data NOT SENT OVER TCP! \n\t... but it is written to file. hopefully.");
       Serial.println("Reconnecting to tcp port 2319");
       
-      if (!client.connect(host, port)) {
+      if (!client.connect(host2, port2)) {
         Serial.println("connection failed");
         Serial.println("wait 5 sec...");
         delay(5000);
@@ -366,22 +281,6 @@ void loop() {
       Serial.print("Data sent over TCP: ");
       Serial.println(dataString);
     }
-<<<<<<< HEAD
-
-    doLogging(now, dataString);
-//    File dataFile = SD.open("datalog.txt", FILE_WRITE);
-//    
-//    // if the file is available, write to it:
-//    if (dataFile) {
-//      dataFile.println(dataString);
-//      dataFile.close();
-//
-//    }
-//    // if the file isn't open, pop up an error:
-//    else {
-//      Serial.println("error opening datalog.txt");
-//    }
-=======
   
     File dataFile = SD.open("datalog.txt", FILE_WRITE);
     
@@ -389,25 +288,15 @@ void loop() {
     if (dataFile) {
       dataFile.println(dataString);
       dataFile.close();
-      // print to the serial port too:
-//      Serial.println(dataString);
+
     }
     // if the file isn't open, pop up an error:
     else {
       Serial.println("error opening datalog.txt");
     }
-//    Serial.println(timeOut);
-//    Serial.println(timeOut2);
-//    Serial.println(sizeof(tf));
-<<<<<<< HEAD
->>>>>>> parent of 6824fa8... Internet of Time
-=======
->>>>>>> parent of 6824fa8... Internet of Time
 
-//    Serial.println("closing connection");
-//    client.stop();
-    
     Serial.println("wait 1 sec...");
     delay(3000);
 }
+
 
